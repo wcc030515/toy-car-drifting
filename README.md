@@ -2,6 +2,12 @@
 
 基于 Three.js、crashcat 和 Vite 的浏览器玩具车漂移赛车游戏，源码版本 v9.12。
 
+## 在线游玩
+
+[在 GitHub Pages 游玩](https://wcc030515.github.io/toy-car-drifting/)
+
+推送到 `main` 后，GitHub Actions 会自动安装锁定依赖、构建并发布到 GitHub Pages。仓库 Pages 的发布来源为 GitHub Actions。部署只使用构建后的 `dist/`；源码分支继续排除依赖与构建产物。
+
 ## 运行
 
 需要 Node.js 22.13+ 和 pnpm 11.25.0。
