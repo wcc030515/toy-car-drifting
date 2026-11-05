@@ -1,0 +1,9 @@
+Nitro exhaust uses mattatz/THREE.Fire, copyright (c) 2015 mattatz, MIT.
+https://github.com/mattatz/THREE.Fire
+The original Fire.png profile is unchanged. The upstream volumetric shader and
+Ashima Arts simplex noise are retained in an ES module port.
+Adaptations: modern Three.js matrices, blue-white color output, additive blend,
+depth testing and per-car tail placement / intensity envelopes.
+See LICENSE-THREE.Fire.txt and LICENSE-webgl-noise.txt.
+Downloaded original files and SHA records are retained outside the runtime in
+research/assets/downloads/audio-vfx-v9.8/sources.json (2026-11-04).

@@ -1,0 +1,68 @@
+Community audio for Toy Car Drift / 玩具车漂移 (local v9.11)
+
+Sound effects by Kenney, released under Creative Commons CC0 1.0:
+https://kenney.nl/assets/interface-sounds
+https://kenney.nl/assets/sci-fi-sounds
+https://kenney.nl/assets/digital-audio
+https://kenney.nl/assets/ui-audio
+https://kenney.nl/assets/impact-sounds
+
+Race Start Countdown by kheetor, used under the CC0 option on the original page:
+https://opengameart.org/content/race-start-countdown
+Ticking clock. by bart, CC0:
+https://opengameart.org/content/ticking-clock
+The race recording is split at 1 / 3 seconds to synchronize each cue with the
+game clock. Four original clock ticks alternate during a bomb's fuse, with
+increasing repetition speed and no artificial pitch rise. Samples are converted
+to mono PCM WAV with light low-pass filtering, peak 0.60 and soft edge fades.
+See LICENSE-countdowns-CC0.txt. Publisher pages verified 2026-11-05.
+
+Background music: Pure Raceway (normal version, BPM 160) by MintoDog.
+Published on OpenGameArt, explicitly marked CC0:
+https://opengameart.org/content/pure-raceway
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Publisher pages and licenses verified 2026-11-04.
+
+The original music MP3 is unchanged. Gameplay effect recordings were decoded to PCM WAV,
+peak normalized to 0.80 with headroom for device resampling; the two looping
+effects use a 40 ms overlap crossfade. One-shot edges fade over 1.5 / 4 ms.
+The game applies gain, panning, pitch and playback envelopes at runtime.
+No replacement synthesized interaction sound effects were generated.
+Original reference-game engine and skid audio remain separate. Collision playback
+keeps the reference game's speed-dependent gain, tone and spatialization, with
+the selected Kenney recordings replacing its generated impact buffers.
+The three v9.8 UI recordings replace the older interface clicks. They use a
+two-stage 1800 Hz low-pass, peak 0.42 and 5 / 18 ms edge fades for softer feedback.
+
+Selected original recording -> runtime name:
+UI Audio: click2 -> ui-select-soft; click1 -> ui-confirm-soft;
+rollover5 -> ui-back-soft (also pause / resume / return).
+Interface: minimize_003 -> throw.
+Sci-fi: thrusterFire_000 -> nitro-on; spaceEngineSmall_000 -> nitro-loop;
+forceField_000 -> shield-on; forceField_002 -> shield-hit;
+explosionCrunch_000 -> explosion; computerNoise_001 -> confusion-loop.
+Digital: phaseJump1 -> npc-arrival; phaserDown2 -> banana-slip.
+
+Victory A1: Race Finish Best (Jingle) by MintoDog, CC0:
+https://opengameart.org/content/racing-game-finish-jingle
+-> finish-race-best.wav (5.01 seconds; plays fully across the results transition).
+Collision B3: Impact Sounds by Kenney, CC0. User-requested preview-label swap:
+impactPlate_heavy_000 -> collision-small.wav (original preview "heavier").
+impactPlate_medium_000 -> collision-large.wav (original preview "medium").
+These three files are byte-identical to the approved audition WAVs, including
+their audition gain and 2 / 8 ms edge fades. See LICENSE-finish-CC0.txt and the
+unchanged original LICENSE-kenney-impact.txt. Unselected audition files are not
+runtime dependencies. Selected on 2026-11-05.
+
+The original five Kenney License.txt files accompany these recordings.
+
+Water entry: splash_04.ogg from "40 CC0 water / splash / slime SFX"
+by rubberduck, CC0, published 2018-07-29:
+https://opengameart.org/content/40-cc0-water-splash-slime-sfx
+-> water-splash.wav (mono 44100 Hz PCM, peak 0.82, 2 / 15 ms edge fades).
+Triggered once on actual player/NPC water contact, not on leaving the road.
+See LICENSE-water-splash-CC0.txt. Source listing checked 2026-11-05.
+
+v9.11: background music gain recalibrated from maximum .09/.7 to .5,
+with independent persistent music/SFX mute switches. Three alternative CC0
+BGMs are audition-only and have not replaced Pure Raceway.

@@ -1,0 +1,18 @@
+40 CC0 water / splash / slime SFX
+Creator: rubberduck
+Original publisher page:
+https://opengameart.org/content/40-cc0-water-splash-slime-sfx
+Original download:
+https://opengameart.org/sites/default/files/water-splash-slime-sfx.zip
+
+Original publisher listing labels this work CC0.
+Creative Commons Zero 1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/
+Legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+Publisher listing checked 2026-11-05.
+
+Selected source: splash_04.ogg
+Runtime: water-splash.wav
+Conversion: 44100 Hz mono PCM WAV, peak normalized to 0.82,
+2 ms opening / 15 ms closing edge fades, no pitch change or added layers.
+No other sounds from the pack are runtime dependencies.

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#c9e9e8"/><title>玩具车漂移</title></head>
+<body class="loading">
+  <style>
+    body.loading{margin:0;background:#f6f1d9}body.loading>:not(#loading-screen){display:none!important}
+    #loading-screen{position:fixed;inset:0;z-index:100;background:#f6f1d9;color:#254b45;display:flex;flex-direction:column;align-items:center;justify-content:center;border-block:clamp(12px,3vh,32px) solid #203b32;font-family:"Segoe UI","Microsoft YaHei",sans-serif}
+    #loading-screen[hidden]{display:none}#loading-screen h1{font-size:clamp(32px,5vw,64px);margin:0 24px 11vh;letter-spacing:3px;text-align:center}#loading-status{font-size:16px;margin:0 0 20px;color:#687b5f}
+    #loading-progress{width:min(72vw,760px);height:18px;border:2px solid #e4dcb4;border-radius:20px;background:#d9d8b8;overflow:hidden}#loading-fill{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#e9bc59,#fa8b3b)}#loading-percent{font-size:15px;font-variant-numeric:tabular-nums;color:#687b5f;margin:16px 0 0}#loading-retry{margin-top:24px;border:0;border-radius:12px;background:#187d75;color:#fff;font:inherit;padding:12px 32px;cursor:pointer}#loading-retry[hidden]{display:none}
+  </style>
+  <section id="loading-screen" aria-label="游戏加载" aria-busy="true">
+    <h1>玩具车漂移</h1><p id="loading-status" role="status">加载中</p>
+    <div id="loading-progress" role="progressbar" aria-label="加载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="loading-fill"></i></div>
+    <p id="loading-percent" aria-hidden="true">0%</p><button id="loading-retry" hidden>重试</button>
+  </section>
+  <div id="game"></div>
+  <header class="hud" id="hud">
+    <div class="brand"><span class="brand-icon" aria-hidden="true">↝</span><b>玩具车漂移</b></div>
+    <div class="race-status"><span id="surface" hidden></span><strong id="timer" aria-label="比赛用时">00:00.00</strong><button id="pause" aria-label="暂停" title="暂停 · Esc">Ⅱ</button></div>
+  </header>
+  <div class="progress"><i id="progress-fill"></i></div>
+  <div id="notice" aria-live="polite"></div>
+  <div class="dashboard"><div class="speed"><strong id="speed">0</strong><span>km/h</span></div><span class="separator"></span><b id="progress-text" aria-label="赛道进度">0%</b></div>
+  <div class="quick-actions"><button id="sound" title="声音设置" aria-label="声音设置" aria-controls="audio-settings" aria-expanded="false">🔊</button><button id="help" title="操作说明 · H" aria-label="操作说明">?</button></div>
+  <aside id="controls" hidden aria-label="操作说明"><header><b>操作</b><button id="help-close" aria-label="关闭操作说明">×</button></header><p><kbd>W / ↑</kbd> 加速</p><p><kbd>S / ↓</kbd> 刹车 / 倒车</p><p><kbd>A D / ← →</kbd> 转向</p><p><kbd>R</kbd> 重开　<kbd>Esc</kbd> 暂停</p><p class="control-rule">落水后 3 秒返回赛道。</p><details><summary>互动效果</summary><dl><dt>1 氮气 · 3 秒</dt><dd>加速</dd><dt>2 保护罩 · 5 秒</dt><dd>抗撞，免疫香蕉和炸弹</dd><dt>3 天降 NPC</dt><dd>新增车辆，前三秒穿透</dd><dt>4 香蕉皮</dt><dd>打滑旋转 3 秒</dd><dt>5 炸弹</dt><dd>碰车或 5 秒后爆炸</dd><dt>6 方向混乱 · 5 秒</dt><dd>仅左右反转</dd></dl><p class="control-rule">持续效果叠加时间。</p></details></aside>
+  <div id="overlay" class="overlay" hidden>
+    <section class="menu" id="menu">
+      <h1 id="menu-title">准备出发</h1>
+      <p id="menu-description" hidden></p>
+      <button class="primary" id="start" disabled>开始比赛</button>
+      <button class="menu-home" id="return-home">返回开始</button>
+    </section>
+  </div>
+  <div id="countdown" aria-live="assertive"></div>
+  <div class="touch-pedals"><button data-input="left" aria-label="左转">←</button><button data-input="right" aria-label="右转">→</button><span></span><button data-input="brake" aria-label="刹车">刹车</button><button data-input="gas" aria-label="油门">油门</button></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

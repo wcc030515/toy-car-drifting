@@ -1,0 +1,19 @@
+Race Finish Best (Jingle)
+Creator: MintoDog
+Published in Racing Game Finish & Jingle on OpenGameArt:
+https://opengameart.org/content/racing-game-finish-jingle
+Original download:
+https://opengameart.org/sites/default/files/ogg_racing_game_finish_jingle.zip
+
+The original publisher page explicitly labels this work CC0.
+Creative Commons Zero 1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/
+Legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+Source page and license checked 2026-11-05.
+
+Source file: Race Finish Best (Jingle).ogg
+Source SHA256: 7798f97d1e429c251f1e00be80637ba04bf7bb74692ccd043c5548e97346f319
+Runtime file: finish-race-best.wav
+Runtime SHA256: ee6efe6568cb04a46cdba2c264574be4abace3394dae8ac9b8546adcc9e4ed29
+Conversion: stereo PCM WAV, 44100 Hz, audition gain 0.8046125605854503,
+2 ms opening / 8 ms closing edge fades. No pitch change or added layers.

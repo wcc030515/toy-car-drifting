@@ -1,0 +1,22 @@
+Community countdown recordings used in Toy Car Drift / 玩具车漂移.
+Verified on the original publisher pages on 2026-11-05.
+
+Race Start Countdown — kheetor
+https://opengameart.org/content/race-start-countdown
+Original file: countdown.ogg
+The publisher offers several alternative licenses, including CC0. This game
+uses the CC0 option. The original page and its license labels are retained in
+research/assets/downloads/countdown-v9.9/race-source.html.
+
+Ticking clock. — bart
+https://opengameart.org/content/ticking-clock
+Original files: ticking clock - tick1.wav through tick4.wav from ticks.zip
+The original publisher page explicitly declares CC0. Its source is retained in
+research/assets/downloads/countdown-v9.9/clock-source.html.
+
+Creative Commons CC0 1.0 Universal Public Domain Dedication:
+https://creativecommons.org/publicdomain/zero/1.0/
+Legal code: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+Game edits: countdown segmentation, mono PCM conversion, light low-pass
+filtering, level adjustment and edge fades. No replacement tones synthesized.
