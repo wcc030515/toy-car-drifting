@@ -145,7 +145,7 @@ function pauseRace(){
 function beginFinish(){
   interactions?.endRace();
   mode='finishing';finishElapsed=elapsed;finishStableTime=0;finishAge=0;
-  clearInput();$('countdown').textContent='';notice('冲线！',2);
+  clearInput();$('countdown').textContent='';
 }
 function settleFinish(){
   rigidBody.setLinearVelocity(world,vehicle.rigidBody,[0,0,0]);
@@ -337,7 +337,7 @@ function updateHud(){
   const crossed=mode==='finished'||mode==='finishing'||(mode==='paused'&&resumeMode==='finishing');
   $('progress-fill').style.width=(crossed?100:percent)+'%';$('progress-text').textContent=(crossed?100:Math.floor(percent))+'%';
   $('speed').textContent=Math.round(Math.hypot(vehicle.sphereVel.x,vehicle.sphereVel.z)*3.6);
-  const title=mode==='floating'||mode==='stranded'?'救援中':mode==='finishing'?'已冲线':'';
+  const title=mode==='floating'||mode==='stranded'?'救援中':'';
   $('surface').hidden=!title;if(title!==lastSurface){lastSurface=title;$('surface').textContent=title;}
   $('progress-text').setAttribute('aria-label',`赛道进度 ${Math.floor(crossed?100:percent)}%`);
 }

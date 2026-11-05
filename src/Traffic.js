@@ -7,7 +7,7 @@ import {angleDifference,finishBananaHeading,stepBananaHeading} from './BananaRec
 const BASE = `${import.meta.env?.BASE_URL ?? '/'}traffic/`;
 const UP = new THREE.Vector3(0, 1, 0);
 const LANES = [-2, 0, 2];
-const ACCEL = 2.5, BRAKE = 5.5, LATERAL_SPEED = .85;
+const ACCEL = 2.5, BRAKE = 5.5, LATERAL_SPEED = .85, MIN_ROAD_SPEED = 1.5;
 const clamp = THREE.MathUtils.clamp;
 const isResting=v=>v?.mode==='floating'||v?.mode==='stranded';
 export const TRAFFIC_MODELS = [
@@ -47,22 +47,42 @@ export const TRAFFIC_MODELS = [
 ];
 export const TRAFFIC_MASSES=Object.freeze(Object.fromEntries(TRAFFIC_MODELS.map(model=>[model.id,model.mass])));
 
-/** Every supplied complete vehicle appears each round; seed only permutes
- * their road order and the two extra cars. Original nine indices stay stable. */
-export function buildTrafficConfigurations(course,models,seed=0x75a1){
+function nextTrafficSeed(previous){
+  const seed=Math.floor(Math.random()*4294967296)>>>0;
+  return seed===previous?(seed+0x9e3779b9)>>>0:seed;
+}
+
+/** Seeded for repeatable tests; normal rounds get a fresh layout. All complete
+ * vehicle models remain represented, with two extras in the 35-car fleet. */
+export function buildTrafficConfigurations(course,models,seed=nextTrafficSeed()){
   let state=seed>>>0;const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
-  const grid=[0,6,2,4].map(i=>i%models.length),remaining=Array.from({length:models.length},(_,i)=>i).filter(i=>!grid.includes(i));
-  for(let i=remaining.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];}
+  const shuffle=items=>{for(let i=items.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[items[i],items[j]]=[items[j],items[i]];}return items;};
+  const order=shuffle(Array.from({length:models.length},(_,i)=>i));
+  const grid=Array.from({length:4},(_,i)=>order[i%order.length]),remaining=order.filter(i=>!grid.includes(i));
   while(remaining.length<31)remaining.push(Math.floor(random()*models.length));
-  const road=remaining.slice(0,31);
+  const road=shuffle(remaining.slice(0,31)),lateSide=random()<.5?-1:1;
+  const starts=[-1.8,1.8,-3.6,3.6].map((lateral,i)=>{
+    const side=Math.sign(lateral),outer=Math.abs(lateral)>3,phase=side===lateSide?4:0;
+    const lane=side*(outer?2.66+random()*.12:1.16+random()*.08);
+    return {s:course.spawn.s,lateral,lane,model:grid[i],cruise:7.5+random()*4,acceleration:1.9+random()*.9,delay:random()*.16,
+      startPath:{startS:course.spawn.s+(outer?9+phase:3)+random()*5,endS:course.spawn.s+(outer?52+4-phase:36+phase)+random()*2}};
+  });
+  const spacing=(course.finishS-190)/31;
   return [
-    {s:course.spawn.s,lateral:-1.8,lane:-2,cruise:10.7,delay:0,model:grid[0]},
-    {s:course.spawn.s,lateral:1.8,lane:2,cruise:14.2,delay:.04,model:grid[1]},
-    {s:course.spawn.s,lateral:-3.6,lane:-2,cruise:6.5,delay:.08,model:grid[2]},
-    {s:course.spawn.s,lateral:3.6,lane:2,cruise:7.2,delay:.12,model:grid[3]},
-    ...road.map((model,i)=>({s:75+i*(course.finishS-190)/31,lateral:LANES[i%3],lane:LANES[i%3],
-      cruise:i%8===3?13.4+(i%3)*.6:5+(i*7%13)*.5,delay:0,model})),
+    ...starts,
+    ...road.map((model,i)=>{const lane=LANES[Math.floor(random()*LANES.length)];return {
+      s:75+i*spacing+(random()-.5)*spacing*.5,lateral:lane,lane,
+      cruise:random()<.2?13.2+random()*1.5:5+random()*6.2,acceleration:2.1+random()*.8,delay:0,model};}),
   ];
+}
+
+/** A distance-based bend has zero lateral slope at each end, including at
+ * launch. It never slides sideways independently of forward movement. */
+export function startLaneAt(config,s){
+  if(!config.startPath)return config.lane;
+  const {startS,endS}=config.startPath,t=clamp((s-startS)/(endS-startS),0,1);
+  const blend=t*t*t*(10+t*(-15+6*t));
+  return THREE.MathUtils.lerp(config.lateral,config.lane,blend);
 }
 
 export function prepare(source, config) {
@@ -125,8 +145,8 @@ export function createTrafficFleet(scene,world,course,models,options={}) {
     const quaternion=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,f.normal,forward));
     return {position,quaternion,frame:f,heading};
   }
-  const configurations=options.configurations??buildTrafficConfigurations(course,models,options.seed);
-  stats.seed=options.seed??0x75a1;
+  stats.seed=options.seed??nextTrafficSeed();
+  const configurations=options.configurations??buildTrafficConfigurations(course,models,stats.seed);
   const parkingCapacity=Math.ceil(configurations.length/parkingLanes.length),parkingSpacing=Math.min(5,33/Math.max(1,parkingCapacity-1));
   function addVehicle(config,eventSpawn=false) {
     const index=vehicles.length;
@@ -157,8 +177,22 @@ export function createTrafficFleet(scene,world,course,models,options={}) {
   stats.parkingCapacity=parkingCapacity*parkingLanes.length;
 
   function reset() {
-    for(const v of vehicles.splice(baseVehicleCount)){restoreGhost(v);rigidBody.remove(world,v.body);group.remove(v.container);}
+    const freshRound=stats.resets>0&&options.configurations===undefined&&options.seed===undefined;
+    const previousFirstRoadModel=vehicles[4]?.config.model;
+    for(const v of vehicles.splice(freshRound?0:baseVehicleCount)){restoreGhost(v);rigidBody.remove(world,v.body);group.remove(v.container);}
+    if(freshRound){
+      stats.seed=nextTrafficSeed(stats.seed);
+      const next=buildTrafficConfigurations(course,models,stats.seed);
+      // Avoid an unlucky repeated first encounter being mistaken for a fixed
+      // roster. Swap model assignments only, preserving coverage and spacing.
+      if(next[4].model===previousFirstRoadModel){
+        const other=next.find((config,i)=>i>4&&config.model!==previousFirstRoadModel);
+        if(other)[next[4].model,other.model]=[other.model,next[4].model];
+      }
+      for(const config of next)addVehicle(config);
+    }
     stats.vehicleCount=vehicles.length;stats.eventVehicles=0;
+    stats.modelCoverage=[...new Set(vehicles.map(v=>v.config.assetId))];
     age=0;parkingCounts.fill(0);parkingArrivals.fill(0);lastPlayer=null;stats.resets++;stats.parked=0;
     stats.contactsWithPlayer=0;stats.npcContacts=0;stats.lastRelativeNormalSpeed=0;stats.maxPoseError=0;
     stats.dynamicReleases=0;stats.rejoined=0;stats.recoveries=0;stats.kinematicVehicleContacts=0;stats.maxReleaseDisplacement=0;
@@ -320,7 +354,9 @@ export function createTrafficFleet(scene,world,course,models,options={}) {
       }
     }
     const playerProxy=playerObstacle(player,progress);
-    const obstacles=vehicles.filter(v=>!isResting(v)).map(v=>({id:v.id,s:v.s,lateral:v.lateral,targetLane:v.lateral,width:v.width,length:v.length,speed:v.speed}));
+    // Intangible arrivals are not a queue to brake behind during their three
+    // second grace period. They join normal traffic when collisions turn on.
+    const obstacles=vehicles.filter(v=>!isResting(v)&&v.ghostRemaining<=0).map(v=>({id:v.id,s:v.s,lateral:v.lateral,targetLane:v.lateral,width:v.width,length:v.length,speed:v.speed}));
     if(playerProxy)obstacles.push(playerProxy);
     for(const v of [...vehicles].sort((a,b)=>b.s-a.s)) {
       if(v.mode==='floating'){syncFloating(v);continue;}
@@ -343,36 +379,41 @@ export function createTrafficFleet(scene,world,course,models,options={}) {
       if(!v.parking&&v.s>finishS-55) {
         let candidates=v.lateral<-.5?[0,1]:v.lateral>.5?[2,3]:[1,2];
         candidates=candidates.filter(i=>parkingCounts[i]<parkingCapacity);
-        if(!candidates.length)candidates=[0,1,2,3].filter(i=>parkingCounts[i]<parkingCapacity);
+        if(!candidates.length)candidates=[0,1,2,3];
         candidates.sort((a,b)=>parkingCounts[a]-parkingCounts[b]||Math.abs(parkingLanes[a]-v.lateral)-Math.abs(parkingLanes[b]-v.lateral));
         const lane=candidates[0];
-        if(lane===undefined){v.speed=0;rigidBody.setLinearVelocity(world,v.body,[0,0,0]);rigidBody.setAngularVelocity(world,v.body,[0,0,0]);continue;}
         parkingCounts[lane]++;
         v.parking={s:finishS+50,lateral:parkingLanes[lane],laneIndex:lane,slotAssigned:false};
       }
       // Longitudinal slots are allocated on actual bay arrival, not far back
       // on the road where a later faster car can still arrive first.
       if(v.parking&&!v.parking.slotAssigned&&v.s>=finishS+11.5&&Math.abs(v.parking.lateral-v.lateral)<.1) {
-        v.parking.s=finishS+50-parkingArrivals[v.parking.laneIndex]++*parkingSpacing;
+        // Gift spawns may exceed the initial fleet. Overflow queues belong in
+        // the service area, never on the course before the finish line.
+        v.parking.s=Math.max(finishS+17,finishS+50-parkingArrivals[v.parking.laneIndex]++*parkingSpacing);
         v.parking.slotAssigned=true;
       }
-      let desired=v.lane;
+      const onStartPath=!!v.config.startPath&&v.s<v.config.startPath.endS+12;
+      let desired=onStartPath?startLaneAt(v.config,v.s+v.speed*dt):v.lane;
       const currentLead=leadAt(v,v.targetLane,obstacles);
-      if(!v.parking&&!v.hazardAvoidance&&v.s>30&&v.cooldown===0&&currentLead.lead&&currentLead.gap<9+v.speed*1.3&&currentLead.lead.speed<v.config.cruise-.6) {
+      if(!onStartPath&&!v.parking&&!v.hazardAvoidance&&v.s>30&&v.cooldown===0&&currentLead.lead&&currentLead.gap<9+v.speed*1.3&&currentLead.lead.speed<v.config.cruise-.6) {
         const alternatives=LANES.filter(lane=>lane!==v.lane&&Math.abs(lane-v.lane)<=2.01&&canChange(v,lane,obstacles));
         alternatives.sort((a,b)=>leadAt(v,b,obstacles).gap-leadAt(v,a,obstacles).gap);
         if(alternatives.length){v.lane=alternatives[0];v.cooldown=3.5;desired=v.lane;}
       }
       if(v.parking&&v.s>finishS+9)desired=v.parking.lateral;
       if(!v.parking||v.s<finishS+9)desired=avoidRoadHazards(v,desired,avoidanceObstacles,{frameAt,lateralSpeed:LATERAL_SPEED,canMove:lane=>canChange(v,lane,obstacles)});
+      const inServiceArea=!!v.parking&&v.s>finishS+9;
+      const mergeEdge=Math.max(0,Math.min(frameAt(v.s).width,frameAt(v.s+3).width)/2-v.width/2-.24);
+      if(!inServiceArea)desired=clamp(desired,-mergeEdge,mergeEdge);
       v.targetLane=desired;
       const changing=Math.abs(desired-v.lateral)>.03;
-      const changeAllowed=age>=v.config.delay&&(!changing||canChange(v,desired,obstacles));
+      const mustMerge=!inServiceArea&&Math.abs(v.lateral)>mergeEdge;
+      const changeAllowed=age>=v.config.delay&&(!changing||mustMerge||canChange(v,desired,obstacles));
       const nextLateral=v.lateral+(changeAllowed?clamp(desired-v.lateral,-LATERAL_SPEED*dt,LATERAL_SPEED*dt):0);
       let curvature=0;
       for(const ahead of [0,7,15,25])curvature=Math.max(curvature,Math.abs(frameAt(v.s+ahead).curvature??0));
       let target=Math.min(v.config.cruise,Math.sqrt(4.7/Math.max(curvature,.0001)));
-      if(Math.abs(v.config.lateral)>3&&v.s<25)target=Math.min(target,3.8);
       if(v.parking&&v.s>finishS-8)target=Math.min(target,6);
       const lead=leadAt(v,v.lateral,obstacles),mergeLead=leadAt(v,nextLateral,obstacles);
       const follow=lead.gap<mergeLead.gap?lead:mergeLead;
@@ -380,19 +421,23 @@ export function createTrafficFleet(scene,world,course,models,options={}) {
       // Keep the road gap until assigned and fully inside the parking aisle.
       const standstillGap=(v.parking?.slotAssigned&&v.s>finishS+12) ? .65 : 2.3;
       if(follow.lead)target=Math.min(target,Math.max(0,follow.lead.speed+(follow.gap-(standstillGap+v.speed*.65))*.85));
-      if(age<v.config.delay)target=0;
-      if(Math.abs(v.config.lateral)>3&&v.s>23&&v.s<80&&Math.abs(v.lateral)>2.15)target=0;
       if(v.parking)target=Math.min(target,Math.sqrt(Math.max(0,2*BRAKE*(v.parking.s-v.s-.04))));
       if(v.parking&&Math.abs(desired-v.lateral)>.1)target=Math.min(target,Math.sqrt(Math.max(0,2*BRAKE*(finishS+12-v.s))));
-      let speed=v.speed+clamp(target-v.speed,-BRAKE*dt,ACCEL*dt);
+      // Road AI may slow or steer, but never choose to stop. If no route is
+      // clear, continue into the real finite-mass collision / prop response.
+      // Free crash motion, banana spinning, water and parking keep their own
+      // state rules; no pose or rebound velocity is overridden here.
+      if(!inServiceArea)target=Math.max(MIN_ROAD_SPEED,target);
+      if(age<v.config.delay)target=0;
+      let speed=v.speed+clamp(target-v.speed,-BRAKE*dt,(v.config.acceleration??ACCEL)*dt);
       let travel=speed*dt;
-      if(follow.lead)travel=Math.min(travel,Math.max(0,follow.gap-.65+follow.lead.speed*dt));
+      if(inServiceArea&&follow.lead)travel=Math.min(travel,Math.max(0,follow.gap-.65+follow.lead.speed*dt));
       if(v.parking)travel=Math.min(travel,Math.max(0,v.parking.s-v.s));
       if(v.parking&&Math.abs(desired-nextLateral)>.1)travel=Math.min(travel,Math.max(0,finishS+12-v.s));
       const nextS=v.s+travel,nextFrame=frameAt(nextS),edge=nextFrame.width/2-v.width/2-.24;
-      // A blocked outer start car waits for its staggered merge, never jumps
-      // sideways or drives across the narrowing road edge.
-      if(Math.abs(nextLateral)>edge)travel=0;
+      // A crowded merge still drives. An unsupported car must obey physics
+      // instead of becoming a stationary kinematic obstacle at the road edge.
+      if(!inServiceArea&&Math.abs(nextLateral)>edge)releaseVehicle(v,.18);
       const targetS=v.s+travel;
       v.speed=travel/dt;v._targetS=targetS;v._targetLateral=nextLateral;
       v._pose=poseAt(targetS,nextLateral,v.height,(nextLateral-v.lateral)/dt,v.speed,v._heading,dt);
@@ -419,7 +464,7 @@ export function createTrafficFleet(scene,world,course,models,options={}) {
           rigidBody.setMotionType(world,v.body,MotionType.KINEMATIC,true);v.mode='cruise';v._heading=heading;stats.rejoined++;
         }
       } else rigidBody.moveKinematic(v.body,v._pose.position.toArray(),v._pose.quaternion.toArray(),dt);
-      const reserved=obstacles.find(o=>o.id===v.id);reserved.targetLane=changeAllowed?v.targetLane:v.lateral;
+      const reserved=obstacles.find(o=>o.id===v.id);if(reserved)reserved.targetLane=changeAllowed?v.targetLane:v.lateral;
       v.parked=!!v.parking?.slotAssigned&&Math.abs(v.parking.s-targetS)<.06&&Math.abs(v.parking.lateral-nextLateral)<.06&&v.speed<.15;
     }
     // Kinematic moveKinematic writes this step's actual planned velocity.
