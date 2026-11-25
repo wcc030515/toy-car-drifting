@@ -1,3 +1,4 @@
+import {giftViewer} from './GiftLabels.js';
 import * as THREE from 'three';
 import {rigidBody,MotionType} from 'crashcat';
 import {setBodyMass} from './PhysicsTweaks.js';
@@ -31,7 +32,7 @@ export function hazardTouchesVehicle(item,actor){
 }
 
 export function createInteractionEvents({world,course,vehicle,traffic,visuals,getMode,onNotice=()=>{},onSound=()=>{},random=Math.random}){
- const timers={nitro:0,stabilizer:0,confusion:0},hazards=[],pending=[],spawnHistory=[];
+ const giftViewers={},timers={nitro:0,stabilizer:0,confusion:0},hazards=[],pending=[],spawnHistory=[];
  const stats={triggers:0,spawnedNPCs:0,bananasConsumed:0,explosions:0,npcBananaHits:0,playerBananaHits:0,blockedBananas:0,blockedBombs:0};
  let clock=0,nextId=1,slip=null,lastExplosion=null,frictionRestoreUntil=0;
  const previousPlayer=new THREE.Vector3(),previousNPC=new Map();
@@ -50,7 +51,7 @@ export function createInteractionEvents({world,course,vehicle,traffic,visuals,ge
   slip=null;
  }
  function reset(){
-  endSlip();for(const key of Object.keys(timers))timers[key]=0;syncMass();
+  endSlip();for(const key of Object.keys(timers)){timers[key]=0;delete giftViewers[key];}syncMass();
   for(const item of hazards)visuals?.removeHazard(item);hazards.length=0;pending.length=0;spawnHistory.length=0;previousNPC.clear();clock=0;lastExplosion=null;
   frictionRestoreUntil=.25;for(const key of Object.keys(stats))stats[key]=0;visuals?.reset();
  }
@@ -71,7 +72,7 @@ export function createInteractionEvents({world,course,vehicle,traffic,visuals,ge
    if(request.type==='npc'){
     const npc=traffic.spawnEventVehicle({s:pose.s,lateral:pose.lateral,viewer:request.viewer,model:Math.floor(random()*33)});stats.spawnedNPCs++;visuals?.spawnArrival(pose.position,npc);onSound('npc-arrival',pose.position);nextId++;continue;
    }
-   const item={id:nextId++,type:request.type,s:pose.s,lateral:pose.lateral,position:pose.position,radius:(request.type==='bomb'?.34:.32)*PROP_SCALE,height:(request.type==='bomb'?.85:.22)*PROP_SCALE,born:clock,age:0,armed:false};
+   const item={id:nextId++,viewer:request.viewer,type:request.type,s:pose.s,lateral:pose.lateral,position:pose.position,radius:(request.type==='bomb'?.34:.32)*PROP_SCALE,height:(request.type==='bomb'?.85:.22)*PROP_SCALE,born:clock,age:0,armed:false};
    hazards.push(item);visuals?.spawnHazard(item);onSound('throw',pose.position);
   }
   while(spawnHistory.length&&clock-spawnHistory[0].time>6)spawnHistory.shift();
@@ -80,7 +81,8 @@ export function createInteractionEvents({world,course,vehicle,traffic,visuals,ge
   const meta=INTERACTION_TYPES.find(item=>item.id===type);count=Number(count);
   if(!meta||!Number.isInteger(count)||count<1||count>100||getMode()!=='racing')return {accepted:false,reason:getMode()==='racing'?'事件或数量无效':'比赛开始后可触发'};
   stats.triggers+=count;
-  if(meta.duration){timers[type]+=meta.duration*count;if(type==='stabilizer')endSlip();syncMass();onSound({nitro:'nitro-on',stabilizer:'shield-on',confusion:'confusion-loop'}[type]);}
+  viewer={...viewer,...giftViewer(viewer)};
+  if(meta.duration){giftViewers[type]=viewer;timers[type]+=meta.duration*count;if(type==='stabilizer')endSlip();syncMass();onSound({nitro:'nitro-on',stabilizer:'shield-on',confusion:'confusion-loop'}[type]);}
   else {for(let i=0;i<count;i++)pending.push({type,viewer:{...viewer}});allocate();}
   return {accepted:true,type,count,remaining:timers[type]||0,queued:pending.length};
  }
@@ -161,6 +163,6 @@ export function createInteractionEvents({world,course,vehicle,traffic,visuals,ge
   input(input){return timers.confusion>0?{...input,x:-input.x}:input;},
   cameraVehicle(){if(!slip)return vehicle;const proxy=Object.create(vehicle);proxy.heading=slip.heading;return proxy;},
   avoidanceObstacles(){return hazards.filter(h=>clock-h.born>=.3).map(h=>({id:`${h.type}-${h.id}`,type:h.type,s:h.s,lateral:h.lateral,width:h.radius*2,length:h.radius*2,hazard:true}));},
-  updateVisuals(dt){visuals?.update(dt,clock,{vehicle,timers,slip,hazards,enabled:getMode()==='racing'});}
+  updateVisuals(dt){visuals?.update(dt,clock,{vehicle,timers,slip,hazards,giftViewers,npcs:traffic.vehicles,enabled:getMode()==='racing'});}
  };
 }

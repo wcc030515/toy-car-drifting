@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createGiftLabels} from './GiftLabels.js';
 import {PROP_SCALE,PROP_THROW_SECONDS,CONFUSION_STAR_SIZE} from './InteractionConfig.js';
 import {createNitroExhaust,NITRO_TEXTURES} from './NitroExhaust.js';
 
@@ -21,7 +22,7 @@ export async function createInteractionVisuals(scene,loader,{getCamera=()=>null}
   ...Object.entries(NITRO_TEXTURES).map(async([key,path])=>{textures['nitro-'+key]=await textureLoader.loadAsync(BASE+path);}),
  ]);
  const group=new THREE.Group();group.name='Kenney interaction props and particle effects';scene.add(group);
- const quad=new THREE.PlaneGeometry(1,1),particles=[],hazardViews=new Set();
+ const quad=new THREE.PlaneGeometry(1,1),particles=[],hazardViews=new Set();let disposed=false;
  const additive=(key,color,opacity=1)=>new THREE.MeshBasicMaterial({map:textures[key],color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
  const exhaust=createNitroExhaust(group,textures['nitro-profile'],textures.light);
  const shield=nativeModel(sources.shield,1);shield.name='protective-shield-from-minigolf-ball';group.add(shield);
@@ -38,6 +39,7 @@ export async function createInteractionVisuals(scene,loader,{getCamera=()=>null}
   for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,v=new THREE.Vector3(Math.cos(a),Math.random()*1.8,Math.sin(a)).multiplyScalar(scale*(1+Math.random()*2));particle(i%3?'spark':'light',position,v,color,.13+Math.random()*.4,.35+Math.random()*.5,1.6);}
  }
  function spawnHazard(item){
+  if(disposed)return null;
   const model=nativeModel(sources[item.type],(item.type==='bomb'?.85:1.05)*PROP_SCALE);model.name=`native-${item.type}-${item.id}`;
   const marker=new THREE.Mesh(quad,additive('circle',item.type==='bomb'?'#ff5738':'#f7de57',.65));marker.rotation.x=-Math.PI/2;marker.scale.setScalar((item.type==='bomb'?2.1:1.5)*PROP_SCALE);
   // Intersect an off-screen ray with a raised plane: the gift begins above
@@ -65,22 +67,46 @@ export async function createInteractionVisuals(scene,loader,{getCamera=()=>null}
   for(let i=0;i<16;i++)particle('smoke',position.clone().add(new THREE.Vector3(0,.4,0)),new THREE.Vector3((Math.random()-.5)*4,1.5+Math.random()*3,(Math.random()-.5)*4),'#8a8581',1.2+Math.random(),.7+Math.random()*.6,3);
   burst(position,18,radius*.4,'#ffd06b');
  }
- function reset(){for(const item of [...hazardViews])removeHazard(item);for(const p of particles){p.active=false;p.mesh.visible=false;}shield.visible=stars.visible=false;exhaust.reset();}
- function update(dt,time,{vehicle,timers,slip,hazards,enabled=true}){
+ const labels=createGiftLabels();
+ function reset(){labels.clear();for(const item of [...hazardViews])removeHazard(item);for(const p of particles){p.active=false;p.mesh.visible=false;}shield.visible=stars.visible=false;exhaust.reset();}
+ function update(dt,time,{vehicle,timers,slip,hazards,giftViewers={},npcs=[],enabled=true}){
+  if(disposed)return;
   const size=vehicle.visualSize||new THREE.Vector3(.75,.775,1.4),base=vehicle.container.position;
   exhaust.update(dt,time,vehicle,timers.nitro>0,enabled&&!slip);
   shield.visible=enabled&&timers.stabilizer>0;
   if(shield.visible){shield.position.copy(base).add(new THREE.Vector3(0,size.y*.55,0));shield.quaternion.copy(vehicle.container.quaternion);const pulse=1+.025*Math.sin(time*6);shield.scale.set(Math.max(1.2,size.x*1.4)*pulse,Math.max(1.2,size.y*1.65)*pulse,Math.max(1.9,size.z*1.32)*pulse);}
   stars.visible=enabled&&timers.confusion>0;
   if(stars.visible){stars.position.copy(base);for(const [i,star]of stars.children.entries()){const angle=time*2+i*Math.PI/2;star.position.set(Math.cos(angle)*.9,size.y+.4+Math.sin(angle*2)*.12,Math.sin(angle)*.9);star.material.rotation=-angle;}}
+  const gifts=[];
+  const anchor=(key,viewer,position,height)=>{if(viewer?.nickname)gifts.push({key,viewer,position:position.clone().add(new THREE.Vector3(0,height,0))});};
+  if(enabled){
+   let height=size.y+.15;
+   for(const effect of Object.keys(giftViewers))if(timers[effect]>0){anchor(effect,giftViewers[effect],base,height);height+=.5;}
+   for(const npc of npcs)if(npc.container.visible)anchor(`npc:${npc.id}`,npc.viewer,npc.container.position,npc.height+.15);
+  }
   for(const item of hazards){
    const view=item.visual;if(!view)continue;const t=THREE.MathUtils.clamp(item.age/PROP_THROW_SECONDS,0,1);
    view.model.position.lerpVectors(view.throwOrigin,item.position,t).addScaledVector(view.throwArc,Math.sin(t*Math.PI));view.model.position.y+=.04*t;view.model.rotation.y=item.id*1.7;view.model.rotation.z=Math.sin(t*Math.PI)*view.throwSide*.8;
    view.marker.position.copy(item.position);view.marker.position.y+=.025;view.marker.material.opacity=item.armed?.45:.2;
+   if(enabled)anchor(`hazard:${item.id}`,item.viewer,view.model.position,item.height+.12);
    if(item.type==='bomb'){const phase=item.age*8+Math.max(0,item.age-3)**2*5,flash=.5+.5*Math.cos(phase);for(const {mat,color}of view.materials){mat.color.copy(color).lerp(new THREE.Color('#ff3020'),flash*.8);if(mat.emissive)mat.emissive.set('#ff2010').multiplyScalar(flash*.6);}}
   }
+  labels.draw(getCamera(),gifts);
   for(const p of particles){if(!p.active)continue;p.age+=dt;if(p.age>=p.life){p.active=false;p.mesh.visible=false;continue;}const t=p.age/p.life;p.mesh.position.addScaledVector(p.velocity,dt);p.velocity.multiplyScalar(Math.exp(-dt*1.5));p.mesh.material.opacity=(1-t)*(1-t);p.mesh.scale.setScalar(p.size*(1+t*p.growth));}
  }
+ function dispose(){
+  if(disposed)return;reset();labels.dispose();disposed=true;
+  const materials=new Set(),geometries=new Set([quad]);
+  group.traverse(object=>{
+   if(object.material)for(const material of Array.isArray(object.material)?object.material:[object.material])materials.add(material);
+   // Native-model geometry comes from the shared GLTF cache; Sprite geometry
+   // is shared by Three.js. Only these Fire boxes and our marker quad are owned.
+   if(object.name?.startsWith('volumetric-nitro-jet-'))geometries.add(object.geometry);
+  });
+  for(const material of materials)material.dispose();for(const geometry of geometries)geometry?.dispose();
+  for(const texture of new Set(Object.values(textures)))texture.dispose();
+  group.clear();scene.remove(group);particles.length=0;
+ }
  reset();
- return {group,spawnHazard,removeHazard,explode,update,reset,async precompile(renderer,camera){const visible=exhaust.group.visible;try{exhaust.group.visible=true;await renderer.compileAsync(scene,camera);}finally{exhaust.group.visible=visible;}},spawnArrival:position=>{burst(position.clone().add(new THREE.Vector3(0,1,0)),18,1.2);particle('magic',position.clone().add(new THREE.Vector3(0,.2,0)),new THREE.Vector3(),'#86eaff',1.4,.55,1.2);},bananaHit:position=>burst(position,10,.7,'#ffe168'),shieldHit:position=>burst(position.clone().add(new THREE.Vector3(0,.5,0)),12,.8,'#87efff'),get stats(){return {activeParticles:particles.filter(p=>p.active).length,nitroVisible:exhaust.stats.visible,nitro:exhaust.stats,shieldVisible:shield.visible,confusionVisible:stars.visible,nativeProps:[...hazardViews].map(item=>item.type)};}};
+ return {group,spawnHazard,removeHazard,explode,update,reset,dispose,async precompile(renderer,camera){const visible=exhaust.group.visible;try{exhaust.group.visible=true;await renderer.compileAsync(scene,camera);}finally{exhaust.group.visible=visible;}},spawnArrival:position=>{burst(position.clone().add(new THREE.Vector3(0,1,0)),18,1.2);particle('magic',position.clone().add(new THREE.Vector3(0,.2,0)),new THREE.Vector3(),'#86eaff',1.4,.55,1.2);},bananaHit:position=>burst(position,10,.7,'#ffe168'),shieldHit:position=>burst(position.clone().add(new THREE.Vector3(0,.5,0)),12,.8,'#87efff'),get stats(){return {activeParticles:particles.filter(p=>p.active).length,nitroVisible:exhaust.stats.visible,nitro:exhaust.stats,shieldVisible:shield.visible,confusionVisible:stars.visible,nativeProps:[...hazardViews].map(item=>item.type)};}};
 }
